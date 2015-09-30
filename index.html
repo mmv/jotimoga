@@ -1,0 +1,83 @@
+<!doctype html>
+<html>
+
+<head>
+<title>JOTIMOGA - JOTI Morse Game</title>
+
+</head>
+
+<body>
+<noscript>
+    You must have JavaScript enabled to play!
+</noscript>
+
+<div id=react-root>
+</div>
+
+<script src="https://fb.me/react-with-addons-0.13.3.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-core/5.8.25/browser.js"></script>
+<script type="text/babel">
+
+var Morse = {
+    codes: {
+        'A': '.-',
+        'B': '-...',
+        'C': '-.-.',
+        'D': '-..',
+        'E': '.',
+        'F': '..-.',
+        'G': '--.',
+        'H': '....',
+        'I': '..',
+        'J': '.---',
+        'K': '-.-',
+        'L': '.-..',
+        'M': '--',
+        'N': '-.',
+        'O': '---',
+        'P': '.--.',
+        'Q': '--.-',
+        'R': '.-.',
+        'S': '...',
+        'T': '-',
+        'U': '..-',
+        'V': '...-',
+        'W': '.--',
+        'X': '-..-',
+        'Y': '-.--',
+        'Z': '--..',
+        'UNIT': ' ',
+    },
+    times: {
+        '.': 1,
+        '-': 3,
+        'SAMECHAR': 1,
+        'NEXTCHAR': 3,
+        'NEXTWORD': 7
+    },
+
+    textToMorse: function(s) {
+        s = s.toUpperCase().replace(/[^A-Z]+/g, ' ');
+        s = s.split("").map(item => {
+            return (item === ' ' && this.codes.UNIT || this.codes[item]) +
+                this.codes.UNIT;
+        }).join("");
+        return s;
+    },
+
+}
+
+// TODO: remove exposure
+window.Morse = Morse;
+
+var Game = React.createClass({
+    render: () => <code>{ Morse.textToMorse("Hello World") }</code>
+    });
+
+React.render(<Game/>, document.getElementById('react-root'));
+
+</script>
+
+</body>
+
+</html>
