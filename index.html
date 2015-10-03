@@ -140,21 +140,79 @@ var Morse = {
 
 }
 
+function makeSomeCharUp() {
+    return String.fromCharCode('A'.charCodeAt(0) + ((Math.random() * 26)|0))
+}
+
 // TODO: remove exposure
 window.Morse = Morse;
 
 var Game = React.createClass({
+
+    getInitialState: function() {
+        return {
+            playing: false,
+            nextLetter: undefined,
+            message: '',
+            score: 0,
+        };
+    },
 
     toMorse: function() {
         var toConvert = this.refs.in1.getDOMNode().value;
         Morse.morseArrayToSound( Morse.textToMorseArray(toConvert) );
     },
 
+    startGame: function() {
+        this.setState({playing: true, message: ''});
+        this.throwUpNextLetter();
+    },
+
+    throwUpNextLetter: function() {
+        var nextLetter = makeSomeCharUp();
+        console.debug("throwUpNextLetter " + nextLetter);
+        this.setState({ nextLetter: nextLetter });
+        Morse.morseArrayToSound( Morse.textToMorseArray(nextLetter) );
+    },
+
+    checkLetter: function(evt) {
+        var letter = evt.target.value.substr(0,1).toUpperCase();
+        if (letter === "") {
+            return;
+        }
+        if (this.state.nextLetter === letter) {
+            this.setState({
+                score: this.state.score +1,
+                message: this.state.message + letter
+            });
+            this.throwUpNextLetter();
+        } else {
+            // fail?
+        }
+
+        evt.target.value = "";
+        
+    },
+
+    noBlurForYou: evt => evt.target.focus(),
+
     render: function() {
         return (
         <div>
-            <input type="text" ref="in1" defaultValue="Hello World" />
-            <button onClick={this.toMorse}>To Morse</button>
+            { this.state.playing ?
+                <div>
+                    <div>Message: {this.state.message}</div>
+                    <div>beep beep {Morse.textToMorseStr(this.state.nextLetter)}</div>
+                    <input type="text"
+                        onChange={this.checkLetter}
+                        onBlur={this.noBlurForYou}
+                        autoFocus="true"
+                        value="" />
+                    <span>{this.state.score}</span>
+                </div>
+              :
+              <button onClick={this.startGame}>Start Playing</button>
+            }
         </div>
         );
     }
