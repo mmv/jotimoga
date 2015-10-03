@@ -14,9 +14,25 @@
 <div id=react-root>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/es6-promise/3.0.2/es6-promise.js"></script>
 <script src="https://fb.me/react-with-addons-0.13.3.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-core/5.8.25/browser.js"></script>
 <script type="text/babel">
+
+if (!typeof window.Promise === 'undefined' && typeof ES6Promise !== 'undefined') {
+    window.Promise = ES6Promise;
+}
+
+var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+var gainNode = audioCtx.createGain();
+gainNode.connect(audioCtx.destination);
+
+const UNIT_TIME = 200;
+const BEEP_FREQUENCY = 800;
+const GAIN = 0.1;
+const WAVE_TYPE = 'sine';
+
+gainNode.gain.value = GAIN;
 
 var Morse = {
     codes: {
@@ -56,14 +72,70 @@ var Morse = {
         'NEXTWORD': 7
     },
 
-    textToMorse: function(s) {
+    textToMorseArray: function(s) {
         s = s.toUpperCase().replace(/[^A-Z]+/g, ' ');
-        s = s.split("").map(item => {
-            return (item === ' ' && this.codes.UNIT || this.codes[item]) +
-                this.codes.UNIT;
-        }).join("");
-        return s;
+        return s.split("").map(item => {
+            return (item === ' ' && this.codes.UNIT || this.codes[item]);
+        });
     },
+
+    textToMorseStr: function(s) {
+        return this.textToMorseArray(s).map(item => item + this.codes.UNIT).join(" ");
+    },
+
+    symSound: function(c) {
+        var oscillator = audioCtx.createOscillator();
+        oscillator.type = WAVE_TYPE;
+        oscillator.frequency.value = BEEP_FREQUENCY;
+        oscillator.connect(gainNode);
+
+        return new Promise((resolve, reject) => {
+            oscillator.start();
+
+            window.setTimeout(() => {
+                oscillator.stop();
+                window.setTimeout(() => {
+                    resolve();
+                }, UNIT_TIME * this.times.SAMECHAR);
+            }, UNIT_TIME * this.times[c]);
+        });
+
+    },
+
+    morseLetterToSound: function(wstr) {
+        return new Promise((resolve, reject) => {
+            if (wstr === '') {
+                window.setTimeout(() => {
+                    resolve();
+                }, UNIT_TIME * this.times.NEXTCHAR);
+                return;
+            }
+            return this.symSound(wstr.charAt(0))
+                .then(() => {
+                    this.morseLetterToSound(wstr.substr(1)).then(resolve);
+                });
+        });
+    },
+
+    morseArrayToSound: function(arr) {
+        return new Promise((resolve, reject) => {
+            console.log(arr);
+            if (arr.length === 0) {
+                resolve();
+                return;
+            }
+            if (arr[0] === ' ') {
+                window.setTimeout(() => {
+                    this.morseArrayToSound(arr.splice(1)).then(resolve);
+                }, UNIT_TIME * this.times.NEXTWORD);
+                return;
+            }
+            return this.morseLetterToSound(arr[0])
+                .then(() => {
+                    this.morseArrayToSound(arr.splice(1)).then(resolve);
+                });
+        });
+    }
 
 }
 
@@ -71,7 +143,21 @@ var Morse = {
 window.Morse = Morse;
 
 var Game = React.createClass({
-    render: () => <code>{ Morse.textToMorse("Hello World") }</code>
+
+    toMorse: function() {
+        var toConvert = this.refs.in1.getDOMNode().value;
+        Morse.morseArrayToSound( Morse.textToMorseArray(toConvert) );
+    },
+
+    render: function() {
+        return (
+        <div>
+            <input type="text" ref="in1" defaultValue="Hello World" />
+            <button onClick={this.toMorse}>To Morse</button>
+        </div>
+        );
+    }
+
     });
 
 React.render(<Game/>, document.getElementById('react-root'));
