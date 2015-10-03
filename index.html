@@ -1,0 +1,228 @@
+<!doctype html>
+<html>
+
+<head>
+<title>JOTIMOGA - JOTI Morse Game</title>
+
+</head>
+
+<body>
+<noscript>
+    You must have JavaScript enabled to play!
+</noscript>
+
+<div id=react-root>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/es6-promise/3.0.2/es6-promise.js"></script>
+<script src="https://fb.me/react-with-addons-0.13.3.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-core/5.8.25/browser.js"></script>
+<script type="text/javascript" src="waapisim.js"></script>
+<script type="text/babel">
+
+if (!typeof window.Promise === 'undefined' && typeof ES6Promise !== 'undefined') {
+    window.Promise = ES6Promise;
+}
+
+var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+var gainNode = audioCtx.createGain();
+gainNode.connect(audioCtx.destination);
+
+const UNIT_TIME = 200;
+const BEEP_FREQUENCY = 800;
+const GAIN = 0.1;
+const WAVE_TYPE = 'sine';
+
+gainNode.gain.value = GAIN;
+
+var Morse = {
+    codes: {
+        'A': '.-',
+        'B': '-...',
+        'C': '-.-.',
+        'D': '-..',
+        'E': '.',
+        'F': '..-.',
+        'G': '--.',
+        'H': '....',
+        'I': '..',
+        'J': '.---',
+        'K': '-.-',
+        'L': '.-..',
+        'M': '--',
+        'N': '-.',
+        'O': '---',
+        'P': '.--.',
+        'Q': '--.-',
+        'R': '.-.',
+        'S': '...',
+        'T': '-',
+        'U': '..-',
+        'V': '...-',
+        'W': '.--',
+        'X': '-..-',
+        'Y': '-.--',
+        'Z': '--..',
+        'UNIT': ' ',
+    },
+    times: {
+        '.': 1,
+        '-': 3,
+        'SAMECHAR': 1,
+        'NEXTCHAR': 3,
+        'NEXTWORD': 7
+    },
+
+    textToMorseArray: function(s) {
+        s = s.toUpperCase().replace(/[^A-Z]+/g, ' ');
+        return s.split("").map(item => {
+            return (item === ' ' && this.codes.UNIT || this.codes[item]);
+        });
+    },
+
+    textToMorseStr: function(s) {
+        return this.textToMorseArray(s).map(item => item + this.codes.UNIT).join(" ");
+    },
+
+    symSound: function(c) {
+        var oscillator = audioCtx.createOscillator();
+        oscillator.type = WAVE_TYPE;
+        oscillator.frequency.value = BEEP_FREQUENCY;
+        oscillator.connect(gainNode);
+
+        return new Promise((resolve, reject) => {
+            oscillator.start();
+
+            window.setTimeout(() => {
+                oscillator.stop();
+                window.setTimeout(() => {
+                    resolve();
+                }, UNIT_TIME * this.times.SAMECHAR);
+            }, UNIT_TIME * this.times[c]);
+        });
+
+    },
+
+    morseLetterToSound: function(wstr) {
+        return new Promise((resolve, reject) => {
+            if (wstr === '') {
+                window.setTimeout(() => {
+                    resolve();
+                }, UNIT_TIME * this.times.NEXTCHAR);
+                return;
+            }
+            return this.symSound(wstr.charAt(0))
+                .then(() => {
+                    this.morseLetterToSound(wstr.substr(1)).then(resolve);
+                });
+        });
+    },
+
+    morseArrayToSound: function(arr) {
+        return new Promise((resolve, reject) => {
+            console.log(arr);
+            if (arr.length === 0) {
+                resolve();
+                return;
+            }
+            if (arr[0] === ' ') {
+                window.setTimeout(() => {
+                    this.morseArrayToSound(arr.splice(1)).then(resolve);
+                }, UNIT_TIME * this.times.NEXTWORD);
+                return;
+            }
+            return this.morseLetterToSound(arr[0])
+                .then(() => {
+                    this.morseArrayToSound(arr.splice(1)).then(resolve);
+                });
+        });
+    }
+
+}
+
+function makeSomeCharUp() {
+    return String.fromCharCode('A'.charCodeAt(0) + ((Math.random() * 26)|0))
+}
+
+// TODO: remove exposure
+window.Morse = Morse;
+
+var Game = React.createClass({
+
+    getInitialState: function() {
+        return {
+            playing: false,
+            nextLetter: undefined,
+            message: '',
+            score: 0,
+        };
+    },
+
+    toMorse: function() {
+        var toConvert = this.refs.in1.getDOMNode().value;
+        Morse.morseArrayToSound( Morse.textToMorseArray(toConvert) );
+    },
+
+    startGame: function() {
+        this.setState({playing: true, message: ''});
+        this.throwUpNextLetter();
+    },
+
+    throwUpNextLetter: function() {
+        var nextLetter = makeSomeCharUp();
+        console.debug("throwUpNextLetter " + nextLetter);
+        this.setState({ nextLetter: nextLetter });
+        Morse.morseArrayToSound( Morse.textToMorseArray(nextLetter) );
+    },
+
+    checkLetter: function(evt) {
+        var letter = evt.target.value.substr(0,1).toUpperCase();
+        if (letter === "") {
+            return;
+        }
+        if (this.state.nextLetter === letter) {
+            this.setState({
+                score: this.state.score +1,
+                message: this.state.message + letter
+            });
+            this.throwUpNextLetter();
+        } else {
+            // fail?
+        }
+
+        evt.target.value = "";
+        
+    },
+
+    noBlurForYou: evt => evt.target.focus(),
+
+    render: function() {
+        return (
+        <div>
+            { this.state.playing ?
+                <div>
+                    <div>Message: {this.state.message}</div>
+                    <div>beep beep {Morse.textToMorseStr(this.state.nextLetter)}</div>
+                    <input type="text"
+                        onChange={this.checkLetter}
+                        onBlur={this.noBlurForYou}
+                        autoFocus="true"
+                        value="" />
+                    <span>{this.state.score}</span>
+                </div>
+              :
+              <button onClick={this.startGame}>Start Playing</button>
+            }
+        </div>
+        );
+    }
+
+    });
+
+React.render(<Game/>, document.getElementById('react-root'));
+
+</script>
+
+</body>
+
+</html>
